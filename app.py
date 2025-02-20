@@ -1,5 +1,5 @@
 """
- * TextTango: dual letter illusion Streamlit App
+ * TextTango: dual letter illusion Streamlit App with 3D Preview
  * License: Creative Commons - Non Commercial - Share Alike License 4.0 (CC BY-NC-SA 4.0)
  * Copyright: Luca Monari 2023, Modified by Grok 3 (xAI) 2025
  * URL: https://www.printables.com/it/model/520333-texttango-dual-letter-illusion
@@ -9,10 +9,15 @@ import streamlit as st
 from math import pi, sin, cos
 import tempfile
 import os
+from pythreejs import (
+    BufferGeometry, MeshPhongMaterial, Mesh, PerspectiveCamera,
+    DirectionalLight, AmbientLight, Scene, OrbitControls, Renderer
+)
+import numpy as np
 
 # Streamlit UI
 st.title("TextTango: Dual Letter Illusion Generator")
-st.write("Enter two words to create a 3D dual-letter illusion model!")
+st.write("Enter two words to create a 3D dual-letter illusion model with a preview!")
 
 # User inputs
 text1 = st.text_input("First Word", value="HELLO").upper()
@@ -28,7 +33,7 @@ fontPath = ''  # Optional: path to .ttf file if you upload one
 b_fil_per = 0.8  # Fixed base fillet percentage
 
 # CadQuery logic
-def generate_model(text1, text2, fontsize, space_percentage, b_h, b_pad, export_name):
+def generate_model(text1, text2, fontsize, space_percentage, b_h, b_pad):
     extr = fontsize * 2
     space = fontsize * space_percentage
     res = cq.Assembly()
@@ -67,62 +72,4 @@ def generate_model(text1, text2, fontsize, space_percentage, b_h, b_pad, export_
             continue
             
         b_box = a_inter_b.objects[0].BoundingBox()
-        a_inter_b = a_inter_b.translate([0, -b_box.ymin, 0])
-        if i > 0:
-            a_inter_b = a_inter_b.translate([0, last_ymax + space, 0])
-        last_ymax = a_inter_b.objects[0].BoundingBox().ymax
-        res.add(a_inter_b)
-
-    b_box = res.toCompound().BoundingBox()
-    res.add(cq.Workplane()
-            .box(b_box.xlen + b_pad*2, b_box.ylen + b_pad*2, b_h, centered=(1,0,0))
-            .translate([0, -b_pad, -b_h])
-            .edges('|Z')
-            .fillet(min(b_box.xlen, b_box.ylen)/2 * b_fil_per))
-    
-    res = res.toCompound()
-    res = res.translate([0, -b_box.ylen/2, 0])
-    return res
-
-# Generate and download button
-if st.button("Generate 3D Model"):
-    with st.spinner("Generating 3D model..."):
-        try:
-            model = generate_model(text1, text2, fontsize, space_percentage, b_h, b_pad, export_name)
-            
-            # Use temporary files
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.step') as step_file:
-                step_path = step_file.name
-                cq.exporters.export(model, step_path, 'STEP')
-                with open(step_path, 'rb') as f:
-                    step_data = f.read()
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as stl_file:
-                stl_path = stl_file.name
-                cq.exporters.export(model, stl_path, 'STL')
-                with open(stl_path, 'rb') as f:
-                    stl_data = f.read()
-
-            # Download buttons
-            st.download_button(
-                label="Download STEP File",
-                data=step_data,
-                file_name=f"{export_name}.step",
-                mime="application/octet-stream"
-            )
-            st.download_button(
-                label="Download STL File",
-                data=stl_data,
-                file_name=f"{export_name}.stl",
-                mime="application/octet-stream"
-            )
-            st.success("Model generated successfully!")
-
-            # Clean up temporary files
-            os.remove(step_path)
-            os.remove(stl_path)
-            
-        except Exception as e:
-            st.error(f"Error generating model: {str(e)}")
-
-st.write("Note: The generated files can be opened in 3D modeling software like FreeCAD or Blender.")
+        a_inter_b = a_inter_b.translate([0, -b_box
