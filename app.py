@@ -7,7 +7,8 @@
 import cadquery as cq
 import streamlit as st
 from math import pi, sin, cos
-import io
+import tempfile
+import os
 
 # Streamlit UI
 st.title("TextTango: Dual Letter Illusion Generator")
@@ -89,30 +90,38 @@ if st.button("Generate 3D Model"):
         try:
             model = generate_model(text1, text2, fontsize, space_percentage, b_h, b_pad, export_name)
             
-            # Export to STEP
-            step_buffer = io.BytesIO()
-            cq.exporters.export(model, step_buffer, 'STEP')
-            step_buffer.seek(0)
-            
-            # Export to STL
-            stl_buffer = io.BytesIO()
-            cq.exporters.export(model, stl_buffer, 'STL')
-            stl_buffer.seek(0)
-            
+            # Use temporary files
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.step') as step_file:
+                step_path = step_file.name
+                cq.exporters.export(model, step_path, 'STEP')
+                with open(step_path, 'rb') as f:
+                    step_data = f.read()
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as stl_file:
+                stl_path = stl_file.name
+                cq.exporters.export(model, stl_path, 'STL')
+                with open(stl_path, 'rb') as f:
+                    stl_data = f.read()
+
             # Download buttons
             st.download_button(
                 label="Download STEP File",
-                data=step_buffer,
+                data=step_data,
                 file_name=f"{export_name}.step",
                 mime="application/octet-stream"
             )
             st.download_button(
                 label="Download STL File",
-                data=stl_buffer,
+                data=stl_data,
                 file_name=f"{export_name}.stl",
                 mime="application/octet-stream"
             )
             st.success("Model generated successfully!")
+
+            # Clean up temporary files
+            os.remove(step_path)
+            os.remove(stl_path)
+            
         except Exception as e:
             st.error(f"Error generating model: {str(e)}")
 
